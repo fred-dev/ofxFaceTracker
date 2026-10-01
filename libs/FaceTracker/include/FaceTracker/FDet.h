@@ -43,20 +43,38 @@
 namespace FACETRACKER
 {
   //===========================================================================
-  /** 
-      A wrapper for OpenCV's face detector
+  /**
+      A wrapper for OpenCV's face detector.
+
+      The model file stores a Haar cascade in the layout of OpenCV's old C
+      structures (CvHaarClassifierCascade), which OpenCV 4 removed. The cascade
+      is read into the plain structures below and converted in memory to the
+      current cascade format for cv::CascadeClassifier.
   */
   class FDet{
   public:
+    struct HaarRect { float weight; int x, y, width, height; };
+    struct HaarNode {
+      float threshold; int left, right; float alpha; int tilted;
+      HaarRect rect[3];
+    };
+    struct HaarTree {
+      std::vector<HaarNode> nodes;
+      float lastAlpha;              // leaf value after the last node's alpha
+    };
+    struct HaarStage {
+      int parent, next, child; float threshold;
+      std::vector<HaarTree> trees;
+    };
+
     int                      _haar_count;
     cv::Rect                 _haar_rect;
     int                      _min_neighbours; /**< see OpenCV documentation */
     int                      _min_size;       /**< ...                      */
     double                   _img_scale;      /**< ...                      */
     double                   _scale_factor;   /**< ...                      */
-    CvHaarClassifierCascade* _cascade;        /**< ...                      */
 
-    FDet(){storage_=NULL;_cascade=NULL;}
+    FDet(){_haar_count=0;}
     FDet(const char* fname){this->Load(fname);}
     FDet(const char*  cascFile,
 	 const double img_scale = 1.3,
@@ -65,8 +83,9 @@ namespace FACETRACKER
 	 const int    min_size = 30){
       this->Init(cascFile,img_scale,scale_factor,min_neighbours,min_size);
     }
-    ~FDet();
+    ~FDet() {}
     FDet& operator=(FDet const&rhs);
+    /** Loads a cascade from an OpenCV cascade XML file. */
     void Init(const char* fname,
 	      const double img_scale = 1.3,
 	      const double scale_factor = 1.1,
@@ -77,9 +96,13 @@ namespace FACETRACKER
     void Save(const char* fname);
     void Write(std::ofstream &s);
     void Read(std::ifstream &s,bool readType = true);
-    
+
   private:
-    cv::Mat small_img_; CvMemStorage* storage_;
+    void BuildClassifier();
+    cv::Size                 _window;
+    std::vector<HaarStage>   _stages;
+    cv::CascadeClassifier    _classifier;
+    cv::Mat small_img_;
   };
   //===========================================================================
 }

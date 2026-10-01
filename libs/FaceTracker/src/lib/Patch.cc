@@ -162,7 +162,7 @@ void Patch::Response(cv::Mat &im,cv::Mat &resp)
 	     __FILE__,__LINE__,_t); abort();
     }
   }
-  cv::matchTemplate(I,_W,res_,CV_TM_CCOEFF_NORMED);
+  cv::matchTemplate(I,_W,res_,cv::TM_CCOEFF_NORMED);
   cv::MatIterator_<double> p = resp.begin<double>();
   cv::MatIterator_<float> q1 = res_.begin<float>();
   cv::MatIterator_<float> q2 = res_.end<float>();
@@ -236,7 +236,7 @@ void MPatch::Response(cv::Mat &im,cv::Mat &resp)
   if(res_.rows != h || res_.cols != w)res_.create(h,w,CV_64F);
   if(_p.size() == 1){_p[0].Response(im,resp); sum2one(resp);}
   else{
-    resp = cvScalar(1.0);
+    resp = cv::Scalar(1.0);
     for(int i = 0; i < (int)_p.size(); i++){
       _p[i].Response(im,res_); sum2one(res_); resp = resp.mul(res_);
     }

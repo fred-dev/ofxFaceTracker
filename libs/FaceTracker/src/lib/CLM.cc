@@ -66,7 +66,7 @@ void CalcSimT(cv::Mat &src,cv::Mat &dst,
   }
   H.db(1,1) = H.db(0,0); H.db(1,2) = H.db(2,1) = -1.0*(H.db(3,0) = H.db(0,3));
   H.db(1,3) = H.db(3,1) = H.db(2,0) = H.db(0,2); H.db(2,2) = H.db(3,3) = n;
-  cv::solve(H,g,p,CV_CHOLESKY);
+  cv::solve(H,g,p,cv::DECOMP_CHOLESKY);
   a = p.db(0,0); b = p.db(1,0); tx = p.db(2,0); ty = p.db(3,0); return;
 }
 //=============================================================================
@@ -74,7 +74,7 @@ void invSimT(double a1,double b1,double tx1,double ty1,
 	     double& a2,double& b2,double& tx2,double& ty2)
 {
   cv::Mat M = (cv::Mat_<double>(2,2) << a1, -b1, b1, a1);
-  cv::Mat N = M.inv(CV_SVD); a2 = N.db(0,0); b2 = N.db(1,0);
+  cv::Mat N = M.inv(cv::DECOMP_SVD); a2 = N.db(0,0); b2 = N.db(1,0);
   tx2 = -1.0*(N.db(0,0)*tx1 + N.db(0,1)*ty1);
   ty2 = -1.0*(N.db(1,0)*tx1 + N.db(1,1)*ty1); return;
 }
@@ -227,6 +227,8 @@ void CLM::Fit(cv::Mat im, vector<int> &wSize,
 {
   assert(im.type() == CV_8U);
   int i,idx,n = _pdm.nPoints(); double a1,b1,tx1,ty1,a2,b2,tx2,ty2;
+  // Float copy so patches keep sub-pixel precision (cvGetQuadrangleSubPix did 8U->32F).
+  cv::Mat imf; im.convertTo(imf,CV_32F);
   for(int witer = 0; witer < (int)wSize.size(); witer++){
     _pdm.CalcShape2D(cshape_,_plocal,_pglobl);
     CalcSimT(_refs,cshape_,a1,b1,tx1,ty1);
@@ -243,8 +245,13 @@ void CLM::Fit(cv::Mat im, vector<int> &wSize,
 	(cv::Mat_<float>(2,3)<<a1,-b1,cshape_.db(i,0),b1,a1,cshape_.db(i+n,0));
       if((w>wmem_[i].cols) || (h>wmem_[i].rows))wmem_[i].create(h,w,CV_32F);
       cv::Mat wimg = wmem_[i](cv::Rect(0,0,w,h));
-      CvMat wimg_o = wimg,sim_o = sim; IplImage im_o = im;
-      cvGetQuadrangleSubPix(&im_o,&wimg_o,&sim_o);
+      // Same sampling as the removed cvGetQuadrangleSubPix: sim maps patch
+      // coordinates relative to the patch centre into the image.
+      cv::Mat M = sim.clone();
+      M.at<float>(0,2) -= a1*0.5f*(w-1) - b1*0.5f*(h-1);
+      M.at<float>(1,2) -= b1*0.5f*(w-1) + a1*0.5f*(h-1);
+      cv::warpAffine(imf,wimg,M,wimg.size(),
+		     cv::INTER_LINEAR | cv::WARP_INVERSE_MAP,cv::BORDER_REPLICATE);
       if(wSize[witer] > pmem_[i].rows)
 	pmem_[i].create(wSize[witer],wSize[witer],CV_64F);
       prob_[i] = pmem_[i](cv::Rect(0,0,wSize[witer],wSize[witer]));
@@ -280,8 +287,8 @@ void CLM::Optimize(int idx,int wSize,int nIter,
     for(i = 0; i < n; i++){
       if(_visi[idx].rows == n){
 	if(_visi[idx].it(i,0) == 0){
-	  cv::Mat Jx = J.row(i  ); Jx = cvScalar(0);
-	  cv::Mat Jy = J.row(i+n); Jy = cvScalar(0);
+	  cv::Mat Jx = J.row(i  ); Jx = cv::Scalar(0);
+	  cv::Mat Jy = J.row(i+n); Jy = cv::Scalar(0);
 	  ms_.db(i,0) = 0.0; ms_.db(i+n,0) = 0.0; continue;
 	}
       }
@@ -304,7 +311,7 @@ void CLM::Optimize(int idx,int wSize,int nIter,
 	H.db(6+i,6+i) += var; g.db(6+i,0) -= var*_plocal.db(i,0);
       }
     }
-    u_ = cvScalar(0); cv::solve(H,g,u,CV_CHOLESKY);
+    u_ = cv::Scalar(0); cv::solve(H,g,u,cv::DECOMP_CHOLESKY);
     _pdm.CalcReferenceUpdate(u_,_plocal,_pglobl);
     if(!rigid)_pdm.Clamp(_plocal,clamp);
   }return;

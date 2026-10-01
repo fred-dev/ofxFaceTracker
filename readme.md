@@ -1,6 +1,10 @@
 # ofxFaceTracker is openFrameworks addon for face tracking, based on Jason Saragih's FaceTracker library.
 
-**This addon breaks on OF 0.11.0 due OpenCV 4. Consider using [ofxFaceTracker2](https://github.com/HalfdanJ/ofxFaceTracker2)**
+> **About this fork:** updated to build and run with current openFrameworks (0.12+) and OpenCV 4. FaceTracker's face detector used OpenCV's old C Haar API, which OpenCV 4 removed; it now converts the cascade stored in the model file to a `cv::CascadeClassifier` in memory, so the existing model files still work unchanged. The remaining C API calls (`cvGetQuadrangleSubPix`, `cvMatchTemplate`, old constants) are replaced with their C++ equivalents, and an `addon_config.mk` declares the ofxCv and ofxOpenCv dependencies.
+>
+> Checked against the meshes the original version saved for the test portraits in `example-batch-process`: Grace Hopper matches to within 0.1 px and Alan Turing to within about 8 px (the new detector starts the fit from a slightly different rectangle).
+>
+> On macOS, if linking fails with an OpenCV `tvos` or `ios` slice, ofxOpenCv's `addon_config.mk` needs an `osx:` section that excludes those slices from `libs/opencv/lib/macos/opencv.xcframework`.
 
 [openFrameworks](http://openFrameworks.cc/) is an open source toolkit for creative coding.
 
